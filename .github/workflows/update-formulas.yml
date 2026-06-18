@@ -12,9 +12,13 @@ on:
         type: string
       source_repo:
         description: "Repo that publishes the release assets"
-        default: "duneedit/dune"
+        default: "duneyou/dune"
         required: false
         type: string
+  # Fired automatically by the Dune IDE publish workflow after a public release.
+  # client_payload: { version: "0.2.0", source_repo: "duneyou/dune" }
+  repository_dispatch:
+    types: [release]
 
 permissions:
   contents: write
@@ -25,14 +29,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Resolve inputs
+        id: in
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            V="${{ github.event.client_payload.version }}"
+            REPO="${{ github.event.client_payload.source_repo }}"
+          else
+            V="${{ inputs.version }}"
+            REPO="${{ inputs.source_repo }}"
+          fi
+          [ -n "$REPO" ] || REPO="duneyou/dune"
+          if [ -z "$V" ]; then
+            echo "no version provided" >&2
+            exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "source_repo=$REPO" >> "$GITHUB_OUTPUT"
+
       - name: Download assets and compute SHA256
         id: shas
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          V="${{ inputs.version }}"
-          REPO="${{ inputs.source_repo }}"
+          V="${{ steps.in.outputs.version }}"
+          REPO="${{ steps.in.outputs.source_repo }}"
           BASE="https://github.com/${REPO}/releases/download/v${V}"
           mkdir -p /tmp/dune
           fetch_sha() {
@@ -49,8 +72,8 @@ jobs:
 
       - name: Regenerate formula and cask
         env:
-          VERSION: ${{ inputs.version }}
-          REPO: ${{ inputs.source_repo }}
+          VERSION: ${{ steps.in.outputs.version }}
+          REPO: ${{ steps.in.outputs.source_repo }}
           CLI_DARWIN_ARM64: ${{ steps.shas.outputs.cli_darwin_arm64 }}
           CLI_DARWIN_X64: ${{ steps.shas.outputs.cli_darwin_x64 }}
           CLI_LINUX_ARM64: ${{ steps.shas.outputs.cli_linux_arm64 }}
@@ -177,6 +200,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No formula changes"
           else
-            git commit -m "dune-ide ${{ inputs.version }}"
+            git commit -m "dune-ide ${{ steps.in.outputs.version }}"
             git push
           fi

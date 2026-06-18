@@ -8,16 +8,16 @@ cask "dune-ide" do
 
   on_arm do
     sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-    url "https://github.com/duneedit/dune/releases/download/v#{version}/Dune-IDE-darwin-arm64.dmg"
+    url "https://github.com/duneyou/dune/releases/download/v#{version}/Dune-IDE-darwin-arm64.dmg"
   end
   on_intel do
     sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-    url "https://github.com/duneedit/dune/releases/download/v#{version}/Dune-IDE-darwin-x64.dmg"
+    url "https://github.com/duneyou/dune/releases/download/v#{version}/Dune-IDE-darwin-x64.dmg"
   end
 
   name "Dune IDE"
   desc "AI-first desktop IDE"
-  homepage "https://github.com/duneedit/dune"
+  homepage "https://github.com/duneyou/dune"
 
   app "Dune IDE.app"
 

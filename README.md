@@ -52,7 +52,7 @@ dune --help
 ## Release assets
 
 Formulas and casks expect assets published by the
-[Dune IDE release workflow](https://github.com/duneedit/dune) for each tag
+[Dune IDE release workflow](https://github.com/duneyou/dune) for each tag
 `vX.Y.Z`:
 
 | Asset                          | Used by          |

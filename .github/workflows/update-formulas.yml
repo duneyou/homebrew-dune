@@ -1,0 +1,182 @@
+name: Update formulas
+
+# Regenerate Formula/dune-ide-cli.rb and Casks/dune-ide.rb for a Dune IDE
+# release: download the published assets, compute SHA256, and commit.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Dune IDE release version, without the leading v (e.g. 0.2.0)"
+        required: true
+        type: string
+      source_repo:
+        description: "Repo that publishes the release assets"
+        default: "duneedit/dune"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download assets and compute SHA256
+        id: shas
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          V="${{ inputs.version }}"
+          REPO="${{ inputs.source_repo }}"
+          BASE="https://github.com/${REPO}/releases/download/v${V}"
+          mkdir -p /tmp/dune
+          fetch_sha() {
+            local name="$1"
+            curl -fsSL -o "/tmp/dune/${name}" "${BASE}/${name}"
+            sha256sum "/tmp/dune/${name}" | awk '{print $1}'
+          }
+          echo "cli_darwin_arm64=$(fetch_sha dune-darwin-arm64)" >> "$GITHUB_OUTPUT"
+          echo "cli_darwin_x64=$(fetch_sha dune-darwin-x64)" >> "$GITHUB_OUTPUT"
+          echo "cli_linux_arm64=$(fetch_sha dune-linux-arm64)" >> "$GITHUB_OUTPUT"
+          echo "cli_linux_x64=$(fetch_sha dune-linux-x64)" >> "$GITHUB_OUTPUT"
+          echo "cask_darwin_arm64=$(fetch_sha Dune-IDE-darwin-arm64.dmg)" >> "$GITHUB_OUTPUT"
+          echo "cask_darwin_x64=$(fetch_sha Dune-IDE-darwin-x64.dmg)" >> "$GITHUB_OUTPUT"
+
+      - name: Regenerate formula and cask
+        env:
+          VERSION: ${{ inputs.version }}
+          REPO: ${{ inputs.source_repo }}
+          CLI_DARWIN_ARM64: ${{ steps.shas.outputs.cli_darwin_arm64 }}
+          CLI_DARWIN_X64: ${{ steps.shas.outputs.cli_darwin_x64 }}
+          CLI_LINUX_ARM64: ${{ steps.shas.outputs.cli_linux_arm64 }}
+          CLI_LINUX_X64: ${{ steps.shas.outputs.cli_linux_x64 }}
+          CASK_DARWIN_ARM64: ${{ steps.shas.outputs.cask_darwin_arm64 }}
+          CASK_DARWIN_X64: ${{ steps.shas.outputs.cask_darwin_x64 }}
+        run: |
+          set -euo pipefail
+          BASE="https://github.com/${REPO}/releases/download/v${VERSION}"
+          mkdir -p Formula Casks
+
+          cat > Formula/dune-ide-cli.rb << 'FORMULA'
+          # typed: false
+          # frozen_string_literal: true
+
+          # Installs the `dune` command line launcher for Dune IDE.
+          #
+          # Named `dune-ide-cli` to avoid clashing with Homebrew core's OCaml `dune`.
+          # The installed binary is still `dune`; if you also use the OCaml build tool,
+          # manage which one wins on PATH (e.g. `brew unlink dune`).
+          class DuneIdeCli < Formula
+            desc "Dune IDE command line launcher (the `dune` command)"
+            homepage "https://github.com/REPO_PLACEHOLDER"
+            version "VERSION_PLACEHOLDER"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "BASE_PLACEHOLDER/dune-darwin-arm64"
+                sha256 "CLI_DARWIN_ARM64_PLACEHOLDER"
+
+                def install
+                  bin.install "dune-darwin-arm64" => "dune"
+                end
+              end
+              if Hardware::CPU.intel?
+                url "BASE_PLACEHOLDER/dune-darwin-x64"
+                sha256 "CLI_DARWIN_X64_PLACEHOLDER"
+
+                def install
+                  bin.install "dune-darwin-x64" => "dune"
+                end
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm?
+                url "BASE_PLACEHOLDER/dune-linux-arm64"
+                sha256 "CLI_LINUX_ARM64_PLACEHOLDER"
+
+                def install
+                  bin.install "dune-linux-arm64" => "dune"
+                end
+              end
+              if Hardware::CPU.intel?
+                url "BASE_PLACEHOLDER/dune-linux-x64"
+                sha256 "CLI_LINUX_X64_PLACEHOLDER"
+
+                def install
+                  bin.install "dune-linux-x64" => "dune"
+                end
+              end
+            end
+
+            test do
+              assert_predicate bin/"dune", :executable?
+              output = shell_output("#{bin}/dune --version 2>&1", 127)
+              assert_match "Dune IDE", output
+            end
+          end
+          FORMULA
+
+          cat > Casks/dune-ide.rb << 'CASK'
+          # typed: false
+          # frozen_string_literal: true
+
+          cask "dune-ide" do
+            version "VERSION_PLACEHOLDER"
+
+            on_arm do
+              sha256 "CASK_DARWIN_ARM64_PLACEHOLDER"
+              url "BASE_PLACEHOLDER/Dune-IDE-darwin-arm64.dmg"
+            end
+            on_intel do
+              sha256 "CASK_DARWIN_X64_PLACEHOLDER"
+              url "BASE_PLACEHOLDER/Dune-IDE-darwin-x64.dmg"
+            end
+
+            name "Dune IDE"
+            desc "AI-first desktop IDE"
+            homepage "https://github.com/REPO_PLACEHOLDER"
+
+            app "Dune IDE.app"
+            binary "#{appdir}/Dune IDE.app/Contents/Resources/bin/dune", target: "dune"
+
+            zap trash: [
+              "~/Library/Application Support/Dune IDE",
+              "~/Library/Preferences/com.dune.ide.plist",
+              "~/Library/Saved Application State/com.dune.ide.savedState",
+            ]
+          end
+          CASK
+
+          for f in Formula/dune-ide-cli.rb Casks/dune-ide.rb; do
+            sed -i.bak \
+              -e "s|VERSION_PLACEHOLDER|${VERSION}|g" \
+              -e "s|BASE_PLACEHOLDER|${BASE}|g" \
+              -e "s|REPO_PLACEHOLDER|${REPO}|g" \
+              -e "s|CLI_DARWIN_ARM64_PLACEHOLDER|${CLI_DARWIN_ARM64}|g" \
+              -e "s|CLI_DARWIN_X64_PLACEHOLDER|${CLI_DARWIN_X64}|g" \
+              -e "s|CLI_LINUX_ARM64_PLACEHOLDER|${CLI_LINUX_ARM64}|g" \
+              -e "s|CLI_LINUX_X64_PLACEHOLDER|${CLI_LINUX_X64}|g" \
+              -e "s|CASK_DARWIN_ARM64_PLACEHOLDER|${CASK_DARWIN_ARM64}|g" \
+              -e "s|CASK_DARWIN_X64_PLACEHOLDER|${CASK_DARWIN_X64}|g" \
+              "$f"
+            rm -f "${f}.bak"
+          done
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/dune-ide-cli.rb Casks/dune-ide.rb
+          if git diff --staged --quiet; then
+            echo "No formula changes"
+          else
+            git commit -m "dune-ide ${{ inputs.version }}"
+            git push
+          fi

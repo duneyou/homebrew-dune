@@ -1,32 +1,25 @@
 # typed: false
 # frozen_string_literal: true
 
-# Installs the Dune IDE desktop app and links the bundled `dune` launcher onto
-# PATH, mirroring VS Code's `code` command.
+# The Dune desktop app — the tish-ide build (Dune.app). The Tauri app is
+# legacy and no longer ships.
 cask "dune-ide" do
-  version "0.1.0"
+  version "1.5.1"
 
   on_arm do
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-    url "https://github.com/duneyou/dune/releases/download/v#{version}/Dune-IDE-darwin-arm64.dmg"
-  end
-  on_intel do
-    sha256 "0000000000000000000000000000000000000000000000000000000000000000"
-    url "https://github.com/duneyou/dune/releases/download/v#{version}/Dune-IDE-darwin-x64.dmg"
+    sha256 "d2518ce45f356eb899d6f4139f3125b1e12eae17a290713e4d0f544ca4f4ba31"
+    url "https://github.com/duneyou/dune/releases/download/v1.5.1/Dune-tish-darwin-arm64.dmg"
   end
 
-  name "Dune IDE"
+  name "Dune"
   desc "AI-first desktop IDE"
   homepage "https://github.com/duneyou/dune"
 
-  app "Dune IDE.app"
-
-  # Link the bundled launcher so `dune` works from any terminal.
-  binary "#{appdir}/Dune IDE.app/Contents/Resources/bin/dune", target: "dune"
+  app "Dune.app"
 
   zap trash: [
     "~/Library/Application Support/Dune IDE",
-    "~/Library/Preferences/com.dune.ide.plist",
-    "~/Library/Saved Application State/com.dune.ide.savedState",
+    "~/Library/Preferences/com.dune.tish-ide.plist",
+    "~/Library/Saved Application State/com.dune.tish-ide.savedState",
   ]
 end

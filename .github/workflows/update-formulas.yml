@@ -18,15 +18,13 @@ on:
   # Fired automatically by the Dune IDE publish workflow after a public release.
   # client_payload: { version: "0.2.0", source_repo: "duneyou/dune" }
   repository_dispatch:
-    types: [release, release-dune-server]
+    types: [release]
 
 permissions:
   contents: write
 
 jobs:
   bump:
-    # The dune-ide bump — skip the dune-server dispatch (handled by bump-dune-server below).
-    if: github.event_name != 'repository_dispatch' || github.event.action == 'release'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +69,9 @@ jobs:
           echo "cli_linux_x64=$(fetch_sha dune-linux-x64)" >> "$GITHUB_OUTPUT"
           echo "cask_darwin_arm64=$(fetch_sha Dune-IDE-darwin-arm64.dmg)" >> "$GITHUB_OUTPUT"
           echo "cask_darwin_x64=$(fetch_sha Dune-IDE-darwin-x64.dmg)" >> "$GITHUB_OUTPUT"
+          # dune-server ships on the SAME version train (release.yml build-dune-server job).
+          echo "server_darwin_arm64=$(fetch_sha dune-server-darwin-arm64)" >> "$GITHUB_OUTPUT"
+          echo "server_linux_x64=$(fetch_sha dune-server-linux-x64)" >> "$GITHUB_OUTPUT"
 
       - name: Regenerate formula and cask
         env:
@@ -82,6 +83,8 @@ jobs:
           CLI_LINUX_X64: ${{ steps.shas.outputs.cli_linux_x64 }}
           CASK_DARWIN_ARM64: ${{ steps.shas.outputs.cask_darwin_arm64 }}
           CASK_DARWIN_X64: ${{ steps.shas.outputs.cask_darwin_x64 }}
+          SERVER_DARWIN_ARM64: ${{ steps.shas.outputs.server_darwin_arm64 }}
+          SERVER_LINUX_X64: ${{ steps.shas.outputs.server_linux_x64 }}
         run: |
           set -euo pipefail
           BASE="https://github.com/${REPO}/releases/download/v${VERSION}"
@@ -179,7 +182,54 @@ jobs:
           end
           CASK
 
-          for f in Formula/dune-ide-cli.rb Casks/dune-ide.rb; do
+          cat > Formula/dune-server.rb << 'SERVER'
+          # typed: false
+          # frozen_string_literal: true
+
+          # dune-server — the headless Dune workspace server (files, git, terminal over
+          # HTTP + WebSocket). Ships on the SAME release/version as the Dune IDE app.
+          class DuneServer < Formula
+            desc "Headless Dune workspace server (files, git, terminal over HTTP/WS)"
+            homepage "https://github.com/REPO_PLACEHOLDER"
+            version "VERSION_PLACEHOLDER"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "BASE_PLACEHOLDER/dune-server-darwin-arm64"
+                sha256 "SERVER_DARWIN_ARM64_PLACEHOLDER"
+
+                def install
+                  bin.install "dune-server-darwin-arm64" => "dune-server"
+                end
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.intel?
+                url "BASE_PLACEHOLDER/dune-server-linux-x64"
+                sha256 "SERVER_LINUX_X64_PLACEHOLDER"
+
+                def install
+                  bin.install "dune-server-linux-x64" => "dune-server"
+                end
+              end
+            end
+
+            def caveats
+              <<~EOS
+                The /pty WebSocket (interactive terminal) requires:
+                  TISH_HTTP_BACKEND=hyper dune-server --workspace <dir>
+              EOS
+            end
+
+            test do
+              assert_predicate bin/"dune-server", :executable?
+            end
+          end
+          SERVER
+
+          for f in Formula/dune-ide-cli.rb Casks/dune-ide.rb Formula/dune-server.rb; do
             sed -i.bak \
               -e "s|VERSION_PLACEHOLDER|${VERSION}|g" \
               -e "s|BASE_PLACEHOLDER|${BASE}|g" \
@@ -190,6 +240,8 @@ jobs:
               -e "s|CLI_LINUX_X64_PLACEHOLDER|${CLI_LINUX_X64}|g" \
               -e "s|CASK_DARWIN_ARM64_PLACEHOLDER|${CASK_DARWIN_ARM64}|g" \
               -e "s|CASK_DARWIN_X64_PLACEHOLDER|${CASK_DARWIN_X64}|g" \
+              -e "s|SERVER_DARWIN_ARM64_PLACEHOLDER|${SERVER_DARWIN_ARM64}|g" \
+              -e "s|SERVER_LINUX_X64_PLACEHOLDER|${SERVER_LINUX_X64}|g" \
               "$f"
             rm -f "${f}.bak"
           done
@@ -198,80 +250,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/dune-ide-cli.rb Casks/dune-ide.rb
+          git add Formula/dune-ide-cli.rb Casks/dune-ide.rb Formula/dune-server.rb
           if git diff --staged --quiet; then
             echo "No formula changes"
           else
             git commit -m "dune-ide ${{ steps.in.outputs.version }}"
-            git push
-          fi
-
-  # ── dune-server (separate release cadence: dune-server-v* tags on the source repo).
-  # Fired by knoeone/dune-ide's dune-server workflow after it publishes the public
-  # release. client_payload: { version: "0.3.0", source_repo: "knoeone/dune-ide" } —
-  # assets always live on duneyou/dune regardless of source_repo.
-  bump-dune-server:
-    if: github.event_name == 'repository_dispatch' && github.event.action == 'release-dune-server'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download assets and compute SHA256
-        id: shas
-        run: |
-          set -euo pipefail
-          V="${{ github.event.client_payload.version }}"
-          [ -n "$V" ] || { echo "no version provided" >&2; exit 1; }
-          BASE="https://github.com/duneyou/dune/releases/download/dune-server-v${V}"
-          mkdir -p /tmp/ds
-          fetch_sha() {
-            curl -fsSL -o "/tmp/ds/$1" "${BASE}/$1"
-            sha256sum "/tmp/ds/$1" | awk '{print $1}'
-          }
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-          echo "darwin_arm64=$(fetch_sha dune-server-darwin-arm64)" >> "$GITHUB_OUTPUT"
-          echo "linux_x64=$(fetch_sha dune-server-linux-x64)" >> "$GITHUB_OUTPUT"
-
-      - name: Update Formula/dune-server.rb
-        env:
-          VERSION: ${{ steps.shas.outputs.version }}
-          SHA_DARWIN_ARM64: ${{ steps.shas.outputs.darwin_arm64 }}
-          SHA_LINUX_X64: ${{ steps.shas.outputs.linux_x64 }}
-        run: |
-          set -euo pipefail
-          F=Formula/dune-server.rb
-          # Rewrite version, download URLs, and the sha256 under each url. The formula
-          # keeps one url per platform block, so pair each sha with its url line.
-          sed -i \
-            -e "s|version \".*\"|version \"${VERSION}\"|" \
-            -e "s|download/dune-server-v[^/]*/|download/dune-server-v${VERSION}/|g" \
-            "$F"
-          python3 - "$F" "$SHA_DARWIN_ARM64" "$SHA_LINUX_X64" <<'PY'
-          import sys
-          path, sha_mac, sha_linux = sys.argv[1:4]
-          out = []
-          pending = None
-          for line in open(path):
-              if "dune-server-darwin-arm64" in line and "url" in line:
-                  pending = sha_mac
-              elif "dune-server-linux-x64" in line and "url" in line:
-                  pending = sha_linux
-              elif pending and "sha256" in line:
-                  indent = line[: len(line) - len(line.lstrip())]
-                  line = f'{indent}sha256 "{pending}"\n'
-                  pending = None
-              out.append(line)
-          open(path, "w").write("".join(out))
-          PY
-
-      - name: Commit and push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/dune-server.rb
-          if git diff --staged --quiet; then
-            echo "No formula changes"
-          else
-            git commit -m "dune-server ${{ steps.shas.outputs.version }}"
             git push
           fi

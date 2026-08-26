@@ -15,7 +15,7 @@ class DuneIdeCli < Formula
   on_macos do
     if Hardware::CPU.arm?
       url "https://github.com/duneyou/dune/releases/download/v1.5.4/dune-darwin-arm64"
-      sha256 ""
+      sha256 "3449fbc4b101203b9cb37a335bc2a444d57a749b8e92d842ef4045f949d36017"
 
       def install
         bin.install "dune-darwin-arm64" => "dune"

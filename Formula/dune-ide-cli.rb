@@ -9,12 +9,12 @@
 class DuneIdeCli < Formula
   desc "Dune IDE command line launcher (the `dune` command)"
   homepage "https://github.com/duneyou/dune"
-  version "1.5.1"
+  version "1.5.2"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/duneyou/dune/releases/download/v1.5.1/dune-darwin-arm64"
+      url "https://github.com/duneyou/dune/releases/download/v1.5.2/dune-darwin-arm64"
       sha256 ""
 
       def install

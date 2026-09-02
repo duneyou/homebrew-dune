@@ -6,13 +6,13 @@
 class DuneServer < Formula
   desc "Headless Dune workspace server (files, git, terminal over HTTP/WS)"
   homepage "https://github.com/duneyou/dune"
-  version "1.5.14"
+  version "1.5.15"
   license "MIT"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/duneyou/dune/releases/download/v1.5.14/dune-server-darwin-arm64"
-      sha256 "b8cbee713996a5c15fbe9067f2b2a31b3324d56a415a874e823a92169c50de16"
+      url "https://github.com/duneyou/dune/releases/download/v1.5.15/dune-server-darwin-arm64"
+      sha256 "f26cdf0aa27fbb6525d5aa2d7c06e25cedc0b4f23acfdc94a21e9da18729bc33"
 
       def install
         bin.install "dune-server-darwin-arm64" => "dune-server"
@@ -22,8 +22,8 @@ class DuneServer < Formula
 
   on_linux do
     if Hardware::CPU.intel?
-      url "https://github.com/duneyou/dune/releases/download/v1.5.14/dune-server-linux-x64"
-      sha256 "76f232aa9872f270bcc33fc6c7a49e26a4b6608b6a95f2ffa603335f79fc1411"
+      url "https://github.com/duneyou/dune/releases/download/v1.5.15/dune-server-linux-x64"
+      sha256 "9e58c13983efe0b67a4c0c023ba2b5f4e63541533360c86cc335a6b3c762ac54"
 
       def install
         bin.install "dune-server-linux-x64" => "dune-server"

@@ -4,11 +4,11 @@
 # The Dune desktop app — the tish-ide build (Dune.app). The Tauri app is
 # legacy and no longer ships.
 cask "dune-ide" do
-  version "1.7.4"
+  version "1.8.0"
 
   on_arm do
-    sha256 "d3964ac51f7beaa1e7cbc7e00b05b0c1d0bc42fad1c49a741f698f68673dd2a4"
-    url "https://github.com/duneyou/dune/releases/download/v1.7.4/Dune-tish-darwin-arm64.dmg"
+    sha256 "80cc1a56afc6e4e0d53ba672c8255e6411d736bbc17917cbd1abe4acf26ac9e7"
+    url "https://github.com/duneyou/dune/releases/download/v1.8.0/Dune-tish-darwin-arm64.dmg"
   end
 
   name "Dune"

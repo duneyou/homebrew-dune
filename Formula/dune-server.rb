@@ -35,6 +35,11 @@ class DuneServer < Formula
     <<~EOS
       The /pty WebSocket (interactive terminal) requires:
         TISH_HTTP_BACKEND=hyper dune-server --workspace <dir>
+
+      The web workbench is built in: open http://127.0.0.1:8787/ in a browser
+      or connect the Dune Remote app. An access token is always required: it is
+      printed at startup and kept in ~/.dune/server-token (or pass --token <t>).
+      --web-root <dist> serves a different build.
     EOS
   end
 
